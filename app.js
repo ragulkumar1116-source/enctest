@@ -1,5 +1,4 @@
-import { initializeApp }
-from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { initializeApp } from "firebase/app";
 
 import {
     getAuth,
@@ -8,10 +7,9 @@ import {
     sendPasswordResetEmail,
     setPersistence,
     browserSessionPersistence
-}
-from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+} from "firebase/auth";
 
-// FIREBASE CONFIG FROM ENV
+// FIREBASE CONFIG (FROM VITE ENV)
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -24,17 +22,19 @@ const firebaseConfig = {
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// INITIALIZE FIREBASE
+// VALIDATION (IMPORTANT FIX FOR YOUR ERROR)
+if (!firebaseConfig.apiKey) {
+    throw new Error("Firebase config missing. Check .env file (VITE_FIREBASE_API_KEY)");
+}
 
+// INIT FIREBASE
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
 // SESSION ONLY LOGIN
-
 await setPersistence(auth, browserSessionPersistence);
 
-// DOM ELEMENTS
-
+// DOM
 const authForm = document.getElementById("authForm");
 const status = document.getElementById("status");
 const formTitle = document.getElementById("formTitle");
@@ -43,138 +43,75 @@ const forgotPasswordLink = document.getElementById("forgotPassword");
 
 let isLoginMode = true;
 
-// TOGGLE MODE
-
+// TOGGLE LOGIN / SIGNUP
 document.addEventListener("click", (e) => {
-
     if (e.target.id === "switchMode") {
-
         isLoginMode = !isLoginMode;
 
-        formTitle.innerText =
-            isLoginMode ? "Sign In" : "Sign Up";
-
-        submitBtn.innerText =
-            isLoginMode ? "Continue" : "Create Account";
-
-        forgotPasswordLink.style.display =
-            isLoginMode ? "block" : "none";
+        formTitle.innerText = isLoginMode ? "Sign In" : "Sign Up";
+        submitBtn.innerText = isLoginMode ? "Continue" : "Create Account";
+        forgotPasswordLink.style.display = isLoginMode ? "block" : "none";
 
         document.getElementById("toggleText").innerHTML =
             isLoginMode
-            ? `Don't have an account?
-               <span id="switchMode">Sign Up</span>`
-            : `Already have an account?
-               <span id="switchMode">Sign In</span>`;
+                ? `Don't have an account? <span id="switchMode">Sign Up</span>`
+                : `Already have an account? <span id="switchMode">Sign In</span>`;
     }
 });
 
 // FORGOT PASSWORD
-
 forgotPasswordLink.addEventListener("click", async () => {
-
     const email = document.getElementById("email").value;
 
     if (!email) {
-
-        status.style.color = "var(--error)";
+        status.style.color = "red";
         status.innerHTML = "Enter your email first.";
-
         return;
     }
 
     try {
-
         await sendPasswordResetEmail(auth, email);
-
-        status.style.color = "var(--accent)";
-        status.innerHTML =
-            "Reset email sent successfully.";
-
-    } catch (error) {
-
-        status.style.color = "var(--error)";
-        status.innerHTML = error.message;
+        status.style.color = "lightgreen";
+        status.innerHTML = "Reset email sent.";
+    } catch (err) {
+        status.style.color = "red";
+        status.innerHTML = err.message;
     }
 });
 
 // LOGIN / SIGNUP
-
 authForm.addEventListener("submit", async (e) => {
-
     e.preventDefault();
 
-    const email =
-        document.getElementById("email").value;
-
-    const password =
-        document.getElementById("password").value;
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
 
     try {
-
-        status.style.color = "#fff";
-
-        status.innerHTML =
-            isLoginMode
-            ? "Authenticating..."
-            : "Creating account...";
+        status.innerHTML = isLoginMode ? "Logging in..." : "Creating account...";
 
         if (isLoginMode) {
-
-            await signInWithEmailAndPassword(
-                auth,
-                email,
-                password
-            );
-
+            await signInWithEmailAndPassword(auth, email, password);
         } else {
-
-            await createUserWithEmailAndPassword(
-                auth,
-                email,
-                password
-            );
+            await createUserWithEmailAndPassword(auth, email, password);
         }
 
-        // SESSION VERIFY
+        sessionStorage.setItem("verified", "true");
 
-        sessionStorage.setItem(
-            "verified",
-            "true"
-        );
-
-        status.style.color = "var(--accent)";
-        status.innerHTML =
-            "Login successful. Redirecting...";
+        status.style.color = "lightgreen";
+        status.innerHTML = "Success. Redirecting...";
 
         setTimeout(() => {
-
-            window.location.replace(
-                "dashboard.html"
-            );
-
-        }, 1200);
+            window.location.href = "dashboard.html";
+        }, 1000);
 
     } catch (error) {
+        status.style.color = "red";
 
-        console.error(error);
-
-        status.style.color = "var(--error)";
-
-        let msg = error.code
-            .replace("auth/", "")
-            .replaceAll("-", " ");
-
-        status.innerHTML =
-            msg.charAt(0).toUpperCase() +
-            msg.slice(1);
+        let msg = error.code.replace("auth/", "").replaceAll("-", " ");
+        status.innerHTML = msg.charAt(0).toUpperCase() + msg.slice(1);
     }
 });
 
 // BLOCK BACK BUTTON
-
 history.pushState(null, null, location.href);
-
-window.onpopstate = function () {
-    history.go(1);
-};
+window.onpopstate = () => history.go(1);
